@@ -7,6 +7,6 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: Number(process.env.PORT) || 3333,
+  port: Number(process.env.PORT) || 3000,
   corsOrigins,
 };
