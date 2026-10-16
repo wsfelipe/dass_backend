@@ -13,9 +13,21 @@ const validEmployee = {
   shoeSize: '38',
 };
 
-test('normaliza os dados válidos do funcionário', () => {
-  const result = employeeBodySchema.parse(validEmployee);
+function parseEmployee(data) {
+  return employeeBodySchema.validate(data).value;
+}
 
+function safeParseEmployee(data) {
+  const result = employeeBodySchema.validate(data);
+  return !result.error ? { success: true, data: result.value } : { success: false, error: result.error };
+}
+
+function parseListQuery(data) {
+  return listQuerySchema.validate ? listQuerySchema.validate(data) : listQuerySchema.safeParse(data);
+}
+
+test('normaliza os dados válidos do funcionário', () => {
+  const result = parseEmployee(validEmployee);
   assert.deepEqual(result, {
     cpf: '52998224725',
     name: 'Maria da Silva',
@@ -26,15 +38,14 @@ test('normaliza os dados válidos do funcionário', () => {
 });
 
 test('rejeita CPF inválido e tamanhos fora das opções permitidas', () => {
-  assert.equal(employeeBodySchema.safeParse({ ...validEmployee, cpf: '111.111.111-11' }).success, false);
-  assert.equal(employeeBodySchema.safeParse({ ...validEmployee, shirtSize: 'XXL' }).success, false);
-  assert.equal(employeeBodySchema.safeParse({ ...validEmployee, shoeSize: 49 }).success, false);
+  assert.equal(safeParseEmployee({ ...validEmployee, cpf: '111.111.111-11' }).success, false);
+  assert.equal(safeParseEmployee({ ...validEmployee, shirtSize: 'XXL' }).success, false);
+  assert.equal(safeParseEmployee({ ...validEmployee, shoeSize: 49 }).success, false);
 });
 
 test('aplica paginação padrão e aceita os filtros de pesquisa', () => {
-  const result = listQuerySchema.parse({ search: 'maria', shirtSize: 'g', shoeSize: '40', name: '' });
-
-  assert.deepEqual(result, {
+  const result = parseListQuery({ search: 'maria', shirtSize: 'g', shoeSize: '40', name: '' });
+  assert.deepEqual(result.value || result.data || result, {
     search: 'maria',
     shirtSize: 'G',
     shoeSize: 40,
@@ -63,7 +74,6 @@ test('monta a pesquisa SQL com valores parametrizados e paginação', async () =
 
   try {
     const result = await employeeService.list({ search: 'Maria', page: 2, limit: 5 });
-
     assert.equal(result.meta.total, 1);
     assert.equal(result.meta.totalPages, 1);
     assert.equal(result.data[0].shirtSize, 'M');

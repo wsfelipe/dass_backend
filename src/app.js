@@ -4,7 +4,7 @@ const env = require('./config/env');
 const healthRoutes = require('./routes/health.routes');
 const employeesRoutes = require('./routes/employees.routes');
 const swaggerUi = require('swagger-ui-express');
-const openApiDocument = require('./docs/openapi');
+const openApiDocument = require('./docs/index');
 const notFound = require('./middlewares/notFound');
 const errorHandler = require('./middlewares/errorHandler');
 
