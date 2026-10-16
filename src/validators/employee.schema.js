@@ -1,75 +1,131 @@
-const { z } = require('zod');
+const Joi = require('joi');
 const { onlyDigits, isValidCpf } = require('./cpf');
 
 const SHIRT_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XG'];
 const SHOE_MIN = 34;
 const SHOE_MAX = 48;
 
-const shirtSize = z
-  .string({
-    required_error: 'Tamanho de camiseta é obrigatório',
-    invalid_type_error: 'Tamanho de camiseta inválido',
-  })
+const shirtSize = Joi.string()
   .trim()
-  .toUpperCase()
-  .pipe(
-    z.enum(SHIRT_SIZES, {
-      errorMap: () => ({ message: `Tamanho de camiseta inválido. Use: ${SHIRT_SIZES.join(', ')}` }),
+  .uppercase()
+  .valid(...SHIRT_SIZES)
+  .required()
+  .messages({
+    'any.required': 'Tamanho de camiseta é obrigatório',
+    'string.base': 'Tamanho de camiseta inválido',
+    'any.only': `Tamanho de camiseta inválido. Use: ${SHIRT_SIZES.join(', ')}`,
+  });
+
+const shoeSize = Joi.number()
+  .integer()
+  .min(SHOE_MIN)
+  .max(SHOE_MAX)
+  .required()
+  .messages({
+    'number.base': 'Tamanho de calçado deve ser um número',
+    'number.integer': 'Tamanho de calçado deve ser um número inteiro',
+    'number.min': `Tamanho de calçado deve ser entre ${SHOE_MIN} e ${SHOE_MAX}`,
+    'number.max': `Tamanho de calçado deve ser entre ${SHOE_MIN} e ${SHOE_MAX}`,
+    'any.required': 'Tamanho de calçado é obrigatório',
+  });
+
+const employeeBodySchema = Joi.object({
+  cpf: Joi.string()
+    .trim()
+    .custom((value, helpers) => {
+      if (!isValidCpf(value)) return helpers.error('cpf.invalid');
+      return onlyDigits(value);
     })
-  );
-
-const shoeSize = z.coerce
-  .number({ invalid_type_error: 'Tamanho de calçado deve ser um número' })
-  .int('Tamanho de calçado deve ser um número inteiro')
-  .min(SHOE_MIN, `Tamanho de calçado deve ser entre ${SHOE_MIN} e ${SHOE_MAX}`)
-  .max(SHOE_MAX, `Tamanho de calçado deve ser entre ${SHOE_MIN} e ${SHOE_MAX}`);
-
-const employeeBodySchema = z.object({
-  cpf: z
-    .string({ required_error: 'CPF é obrigatório', invalid_type_error: 'CPF inválido' })
+    .required()
+    .messages({
+      'string.base': 'CPF inválido',
+      'any.required': 'CPF é obrigatório',
+      'cpf.invalid': 'CPF inválido',
+    }),
+  name: Joi.string()
     .trim()
-    .refine(isValidCpf, 'CPF inválido')
-    .transform(onlyDigits),
-  name: z
-    .string({ required_error: 'Nome é obrigatório', invalid_type_error: 'Nome inválido' })
+    .min(3)
+    .max(120)
+    .required()
+    .messages({
+      'string.base': 'Nome inválido',
+      'string.min': 'Nome deve ter pelo menos 3 caracteres',
+      'string.max': 'Nome deve ter no máximo 120 caracteres',
+      'any.required': 'Nome é obrigatório',
+    }),
+  email: Joi.string()
     .trim()
-    .min(3, 'Nome deve ter pelo menos 3 caracteres')
-    .max(120, 'Nome deve ter no máximo 120 caracteres'),
-  email: z
-    .string({ required_error: 'E-mail é obrigatório', invalid_type_error: 'E-mail inválido' })
-    .trim()
-    .toLowerCase()
-    .email('E-mail inválido')
-    .max(160, 'E-mail deve ter no máximo 160 caracteres'),
+    .email({ tlds: false })
+    .max(160)
+    .required()
+    .lowercase()
+    .messages({
+      'string.base': 'E-mail inválido',
+      'string.email': 'E-mail inválido',
+      'string.max': 'E-mail deve ter no máximo 160 caracteres',
+      'any.required': 'E-mail é obrigatório',
+    }),
   shirtSize,
   shoeSize,
 });
 
-// O front pode mandar filtros vazios (?name=&email=...), então descartamos antes de validar
-const withoutEmptyValues = (value) => {
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== ''));
-};
+const listQuerySchema = Joi.object({
+  cpf: Joi.string().trim().optional().allow(''),
+  name: Joi.string().trim().optional().allow(''),
+  email: Joi.string().trim().optional().allow(''),
+  search: Joi.string().trim().optional().allow(''),
+  shirtSize: shirtSize.optional(),
+  shoeSize: shoeSize.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+}).unknown(false);
 
-const listQuerySchema = z.preprocess(
-  withoutEmptyValues,
-  z.object({
-    cpf: z.string().trim().optional(),
-    name: z.string().trim().optional(),
-    email: z.string().trim().optional(),
-    search: z.string().trim().optional(),
-    shirtSize: shirtSize.optional(),
-    shoeSize: shoeSize.optional(),
-    page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(100).default(10),
-  })
-);
-
-const idParamSchema = z.object({
-  id: z.coerce
-    .number({ invalid_type_error: 'ID inválido' })
-    .int('ID inválido')
-    .positive('ID inválido'),
+const idParamSchema = Joi.object({
+  id: Joi.number().integer().positive().required()
+    .messages({
+      'number.base': 'ID inválido',
+      'number.integer': 'ID inválido',
+      'number.positive': 'ID inválido',
+      'any.required': 'ID é obrigatório',
+    }),
 });
 
-module.exports = { SHIRT_SIZES, employeeBodySchema, listQuerySchema, idParamSchema };
+function withoutEmptyValues(value) {
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== '')
+  );
+}
+
+const listQuerySchemaProcessed = Joi.object({
+  cpf: Joi.string().trim().optional().allow(''),
+  name: Joi.string().trim().optional().allow(''),
+  email: Joi.string().trim().optional().allow(''),
+  search: Joi.string().trim().optional().allow(''),
+  shirtSize: shirtSize.optional(),
+  shoeSize: shoeSize.optional(),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(10),
+}).unknown(false);
+
+function normalizeQuery(query) {
+  const cleaned = withoutEmptyValues(query);
+  return Joi.attempt(cleaned, listQuerySchemaProcessed);
+}
+
+module.exports = {
+  SHIRT_SIZES,
+  employeeBodySchema,
+  listQuerySchema: {
+    validate: (data) => normalizeQuery(data),
+    safeParse: (data) => {
+      try {
+        const result = normalizeQuery(data);
+        return { success: true, data: result };
+      } catch (e) {
+        return { success: false, error: e };
+      }
+    },
+  },
+  idParamSchema,
+};
