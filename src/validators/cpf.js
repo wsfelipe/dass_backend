@@ -6,7 +6,6 @@ function isValidCpf(value) {
   const cpf = onlyDigits(value);
 
   if (cpf.length !== 11) return false;
-  // 111.111.111-11 e afins passam na conta mas não existem
   if (/^(\d)\1{10}$/.test(cpf)) return false;
 
   const checkDigit = (length) => {

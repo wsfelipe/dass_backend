@@ -1,7 +1,7 @@
 const service = require('../services/employees.service');
 
 async function list(req, res) {
-  const result = await service.list(req.valid.query);
+  const result = await service.list(req.query);
   res.json(result);
 }
 
