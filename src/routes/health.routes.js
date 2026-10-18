@@ -3,7 +3,6 @@ const db = require('../config/db');
 
 const router = Router();
 
-// Também serve pra "acordar" o banco quando ele está em plano que hiberna
 router.get('/', async (req, res) => {
   try {
     await db.query('select 1');

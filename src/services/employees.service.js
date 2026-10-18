@@ -135,7 +135,6 @@ async function create(data) {
       [data.cpf, data.name, data.email, shirtSizeId, shoeSizeId]
     );
     const row = result.rows[0];
-    // retorno com join para ter códigos
     const full = await db.query(`
       SELECT e.*, ss.code AS shirt_size_code, sh.size AS shoe_size_size
       FROM employees e
@@ -166,10 +165,6 @@ async function update(id, data) {
       fields.push(`shoe_size_id = $${idx++}`); values.push(sid);
     }
     fields.push(`updated_at = NOW()`);
-
-    if (fields.length === 1) {
-      // apenas updated_at, mas ainda precisa atualizar
-    }
 
     values.push(id);
     const result = await db.query(

@@ -1,7 +1,7 @@
 const service = require('../services/employees.service');
 
 async function list(req, res) {
-  const result = await service.list(req.query); // uso direto para garantir filtro
+  const result = await service.list(req.query);
   res.json(result);
 }
 
