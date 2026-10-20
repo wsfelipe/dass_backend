@@ -19,6 +19,20 @@ function escapeLike(term) {
   return term.replace(/[\\%_]/g, '\\$&');
 }
 
+function parseArrayParam(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [value];
+  }
+  return value ? [value] : value;
+}
+
 function buildFilters({ cpf, name, email, shirtSize, shoeSize, search }) {
   const conditions = [];
   const values = [];
@@ -45,10 +59,14 @@ function buildFilters({ cpf, name, email, shirtSize, shoeSize, search }) {
   if (name) conditions.push(`e.name ILIKE ${addValue(`%${escapeLike(name)}%`)}`);
   if (email) conditions.push(`e.email ILIKE ${addValue(`%${escapeLike(email)}%`)}`);
   if (shirtSize) {
-    conditions.push(`ss.code = ${addValue(shirtSize)}`);
+    const sizes = parseArrayParam(shirtSize);
+    const placeholders = sizes.map((s) => addValue(s)).join(',');
+    conditions.push(`ss.code IN (${placeholders})`);
   }
-  if (shoeSize !== undefined) {
-    conditions.push(`sh.size = ${addValue(shoeSize)}`);
+  if (shoeSize !== undefined && shoeSize !== null && shoeSize !== '') {
+    const sizes = parseArrayParam(shoeSize);
+    const placeholders = sizes.map((s) => addValue(s)).join(',');
+    conditions.push(`sh.size IN (${placeholders})`);
   }
 
   return {
@@ -89,7 +107,7 @@ async function list(filters) {
   if (!filters || typeof filters !== 'object') filters = {};
   const page = filters.page || 1;
   const limit = filters.limit || 10;
-  const { page: _p, limit: _l, ...rest } = filters;
+  const { page: _p, limit: _l, sort, order, ...rest } = filters;
   const { where, values } = buildFilters(rest);
 
   const baseQuery = `
@@ -98,8 +116,19 @@ async function list(filters) {
     JOIN shoe_sizes sh ON e.shoe_size_id = sh.id
   `;
 
+  let orderByClause = 'ORDER BY e.name, e.id';
+  if (sort) {
+    const allowed = ['cpf', 'name', 'email', 'shirtSize', 'shoeSize'];
+    if (!allowed.includes(sort)) {
+      throw new HttpError(422, 'Dados inválidos', [{ field: 'sort', message: 'Coluna de ordenação inválida. Use: cpf, name, email, shirtSize, shoeSize' }]);
+    }
+    const sortColumn = sort === 'shirtSize' ? 'ss."order"' : sort === 'shoeSize' ? 'sh."order"' : `e.${sort}`;
+    const sortOrder = (order || 'asc').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    orderByClause = `ORDER BY ${sortColumn} ${sortOrder}, e.id ASC`;
+  }
+
   const countSql = `SELECT COUNT(*) AS count ${baseQuery} ${where}`;
-  const listSql = `SELECT e.*, ss.code AS shirt_size_code, sh.size AS shoe_size_size ${baseQuery} ${where} ORDER BY e.name, e.id LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+  const listSql = `SELECT e.*, ss.code AS shirt_size_code, sh.size AS shoe_size_size ${baseQuery} ${where} ${orderByClause} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
 
   const [countResult, rows] = await Promise.all([
     db.query(countSql, values),
