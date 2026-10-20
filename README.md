@@ -5,6 +5,7 @@ API REST para cadastro, consulta, edição e exclusão de funcionários e seus t
 ## Requisitos
 
 - Node.js 18 ou superior
+- Docker (para subar o PostgreSQL local via `docker-compose.yml`)
 - PostgreSQL acessível pela aplicação
 
 ## Configuração
@@ -14,12 +15,23 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Configure `DATABASE_URL` no `.env` com a URL do PostgreSQL.
+Subir o banco local (PostgreSQL via Docker — já aplica o schema automaticamente):
 
-Crie a tabela da aplicação no banco:
+```powershell
+docker compose up -d db
+Copy-Item .env.example .env
+```
+
+Crie a tabela da aplicação no banco (se estiver usando banco remoto; com Docker o schema já vem aplicado):
 
 ```powershell
 npm run db:create
+```
+
+Inserir 20 usuários fictícios com CPFs válidos (para testes):
+
+```powershell
+node scripts/insert_employees.js
 ```
 
 Inicie a API em desenvolvimento ou produção:
