@@ -3,6 +3,7 @@
 CREATE TABLE shirt_sizes (
   id    SMALLINT    GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   code  VARCHAR(2)  NOT NULL,
+  "order" SMALLINT NOT NULL,
   CONSTRAINT shirt_sizes_code_unique UNIQUE (code)
 );
 
@@ -11,6 +12,7 @@ CREATE TABLE shirt_sizes (
 CREATE TABLE shoe_sizes (
   id    SMALLINT  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   size  SMALLINT  NOT NULL,
+  "order" SMALLINT NOT NULL,
   CONSTRAINT shoe_sizes_size_unique UNIQUE (size)
 );
 
@@ -39,5 +41,5 @@ CREATE INDEX employees_shoe_size_id_idx  ON employees (shoe_size_id);
 
 -- inserts
 
-INSERT INTO shirt_sizes (code) VALUES ('PP'), ('P'), ('M'), ('G'), ('GG'), ('XG');
-INSERT INTO shoe_sizes (size) SELECT generate_series(34, 48);
+INSERT INTO shirt_sizes (code, "order") VALUES ('PP', 1), ('P', 2), ('M', 3), ('G', 4), ('GG', 5), ('XG', 6);
+INSERT INTO shoe_sizes (size, "order") SELECT generate_series(34, 48), generate_series(1, 15);
