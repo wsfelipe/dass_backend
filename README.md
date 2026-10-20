@@ -31,7 +31,9 @@ npm run db:create
 Inserir 20 usuários fictícios com CPFs válidos (para testes):
 
 ```powershell
-node scripts/insert_employees.js
+npm run db:insert
+# ou diretamente:
+node src/database/insert_employees.js
 ```
 
 Inicie a API em desenvolvimento ou produção:
