@@ -75,4 +75,3 @@ Execute os testes com:
 ```powershell
 npm test
 ```
-.
