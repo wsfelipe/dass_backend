@@ -5,6 +5,15 @@ const SHIRT_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XG'];
 const SHOE_MIN = 34;
 const SHOE_MAX = 48;
 
+const shirtSizeItem = Joi.string()
+  .trim()
+  .uppercase()
+  .valid(...SHIRT_SIZES)
+  .messages({
+    'string.base': 'Tamanho de camiseta inválido',
+    'any.only': `Tamanho de camiseta inválido. Use: ${SHIRT_SIZES.join(', ')}`,
+  });
+
 const shirtSize = Joi.string()
   .trim()
   .uppercase()
@@ -69,16 +78,38 @@ const employeeBodySchema = Joi.object({
   shoeSize,
 });
 
+const ALLOWED_SORT_COLUMNS = ['cpf', 'name', 'email', 'shirtSize', 'shoeSize'];
+
 const listQuerySchema = Joi.object({
   cpf: Joi.string().trim().optional().allow(''),
   name: Joi.string().trim().optional().allow(''),
   email: Joi.string().trim().optional().allow(''),
   search: Joi.string().trim().optional().allow(''),
-  shirtSize: shirtSize.optional(),
-  shoeSize: shoeSize.optional(),
+  shirtSize: Joi.alternatives().try(
+    shirtSize.optional(),
+    Joi.array().items(shirtSizeItem).min(1)
+  ),
+  shoeSize: Joi.alternatives().try(
+    shoeSize.optional(),
+    Joi.array().items(Joi.number().integer().min(SHOE_MIN).max(SHOE_MAX)).min(1)
+  ),
+  sort: Joi.string().trim().valid(...ALLOWED_SORT_COLUMNS).optional()
+    .messages({
+      'any.only': 'Coluna de ordenação inválida',
+    }),
+  order: Joi.string().trim().valid('asc', 'desc').optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
-}).unknown(false);
+}).unknown(false)
+  .custom((value, helpers) => {
+    if (value.order && !value.sort) {
+      return helpers.error('order.requiresSort', { message: 'Necessário informar campo de ordenação (sort)' });
+    }
+    return value;
+  })
+  .messages({
+    'order.requiresSort': 'Necessário informar campo de ordenação (sort)',
+  });
 
 const idParamSchema = Joi.object({
   id: Joi.number().integer().positive().required()
@@ -102,22 +133,63 @@ const listQuerySchemaProcessed = Joi.object({
   name: Joi.string().trim().optional().allow(''),
   email: Joi.string().trim().optional().allow(''),
   search: Joi.string().trim().optional().allow(''),
-  shirtSize: shirtSize.optional(),
-  shoeSize: shoeSize.optional(),
+  shirtSize: Joi.alternatives().try(
+    shirtSize.optional(),
+    Joi.array().items(shirtSizeItem).min(1)
+  ),
+  shoeSize: Joi.alternatives().try(
+    shoeSize.optional(),
+    Joi.array().items(Joi.number().integer().min(SHOE_MIN).max(SHOE_MAX)).min(1)
+  ),
+  sort: Joi.string().trim().valid(...ALLOWED_SORT_COLUMNS).optional()
+    .messages({
+      'any.only': 'Coluna de ordenação inválida',
+    }),
+  order: Joi.string().trim().valid('asc', 'desc').optional(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
-}).unknown(false);
+}).unknown(false)
+  .custom((value, helpers) => {
+    if (value.order && !value.sort) {
+      return helpers.error('order.requiresSort', { message: 'Necessário informar campo de ordenação (sort)' });
+    }
+    return value;
+  })
+  .messages({
+    'order.requiresSort': 'Necessário informar campo de ordenação (sort)',
+  });
+
+function parseQueryArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim().startsWith('[') && value.trim().endsWith(']')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+  return value;
+}
 
 function normalizeQuery(query) {
   const cleaned = withoutEmptyValues(query);
-  return Joi.attempt(cleaned, listQuerySchemaProcessed);
+  const normalized = { ...cleaned };
+  if (normalized.shirtSize !== undefined) normalized.shirtSize = parseQueryArray(normalized.shirtSize);
+  if (normalized.shoeSize !== undefined) normalized.shoeSize = parseQueryArray(normalized.shoeSize);
+  return Joi.attempt(normalized, listQuerySchemaProcessed);
 }
 
 module.exports = {
   SHIRT_SIZES,
+  ALLOWED_SORT_COLUMNS,
   employeeBodySchema,
   listQuerySchema: {
-    validate: (data) => normalizeQuery(data),
+    validate: (data) => {
+      const cleaned = withoutEmptyValues(data);
+      const normalized = { ...cleaned };
+      if (normalized.shirtSize !== undefined) normalized.shirtSize = parseQueryArray(normalized.shirtSize);
+      if (normalized.shoeSize !== undefined) normalized.shoeSize = parseQueryArray(normalized.shoeSize);
+      return Joi.attempt(normalized, listQuerySchemaProcessed);
+    },
     safeParse: (data) => {
       try {
         const result = normalizeQuery(data);
