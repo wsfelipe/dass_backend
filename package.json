@@ -11,7 +11,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node --test",
-    "db:create": "node src/database/create.js"
+    "db:create": "node src/database/create.js",
+    "db:insert": "node src/database/insert_employees.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
